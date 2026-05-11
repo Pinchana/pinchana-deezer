@@ -11,7 +11,7 @@ COPY pinchana-core/pyproject.toml pinchana-core/uv.lock pinchana-core/README.md 
 RUN mkdir -p ../pinchana-core/src
 COPY pinchana-core/src ../pinchana-core/src
 
-COPY pinchana-deezer/pyproject.toml pinchana-deezer/uv.lock pinchana-deezer/README.md ./
+COPY pinchana-deezer/pyproject.toml pinchana-deezer/README.md ./
 RUN uv sync --frozen --no-install-project
 
 COPY pinchana-deezer/src ./src
