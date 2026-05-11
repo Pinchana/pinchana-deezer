@@ -1,0 +1,20 @@
+[project]
+name = "pinchana-deezer"
+version = "0.1.0"
+description = "Deezer music downloader for Pinchana"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pinchana-core",
+    "deezer-python>=7.2.0",
+    "fastapi>=0.136.1",
+    "uvicorn>=0.46.0",
+    "ytmusicapi>=1.10.0",
+]
+
+[tool.uv.sources]
+pinchana-core = { path = "../pinchana-core" }
+
+[build-system]
+requires = ["uv_build>=0.11.8,<0.12.0"]
+build-backend = "uv_build"
