@@ -16,7 +16,7 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from ytmusicapi import YTMusic
 
 from pinchana_core.models import ScrapeRequest, ScrapeResponse
-from pinchana_core.music import MusicDownloader, MusicDownloadError
+from pinchana_core.music import MusicDownloader, MusicDownloadError, RateLimitError
 from pinchana_core.plugins import ScraperPlugin, registry
 from pinchana_core.storage import MediaStorage
 from pinchana_core.vpn import GluetunController, VpnRotationError
@@ -50,8 +50,8 @@ def _search_ytmusic(query: str) -> str | None:
 class DeezerDownloader(MusicDownloader):
     """Deezer → YT Music search → yt-dlp download."""
 
-    def __init__(self, base_dir: str | os.PathLike, proxy: str | None = None):
-        super().__init__(base_dir, proxy)
+    def __init__(self, base_dir: str | os.PathLike, proxy: str | None = None, gluetun=None):
+        super().__init__(base_dir, proxy, gluetun=gluetun)
         self.dz = deezer.Client()
 
     async def resolve(self, url: str) -> tuple[str, dict]:
@@ -60,7 +60,12 @@ class DeezerDownloader(MusicDownloader):
         # Resolve short links
         if "deezer.page.link" in url or "link.deezer.com" in url:
             import requests
-            resp = requests.head(url, allow_redirects=True, timeout=10)
+            try:
+                resp = requests.head(url, allow_redirects=True, timeout=10)
+            except Exception as e:
+                if any(s in str(e).lower() for s in ("timeout", "timed out", "connection", "refused")):
+                    raise RateLimitError(f"Deezer short link resolve blocked: {e}")
+                raise MusicDownloadError(f"Deezer short link resolve failed: {e}")
             url = resp.url
 
         track_match = re.search(r"track/(\d+)", url)
@@ -68,7 +73,12 @@ class DeezerDownloader(MusicDownloader):
 
         if track_match:
             track_id = int(track_match.group(1))
-            track = await loop.run_in_executor(None, lambda: self.dz.get_track(track_id))
+            try:
+                track = await loop.run_in_executor(None, lambda: self.dz.get_track(track_id))
+            except Exception as e:
+                if any(s in str(e).lower() for s in ("403", "429", "rate limit", "too many requests", "timeout", "connection", "blocked", "quota")):
+                    raise RateLimitError(f"Deezer track API blocked: {e}")
+                raise MusicDownloadError(f"Deezer track API failed: {e}")
             if not track:
                 raise MusicDownloadError("Deezer track not found")
 
@@ -95,7 +105,12 @@ class DeezerDownloader(MusicDownloader):
 
         if album_match:
             album_id = int(album_match.group(1))
-            album_obj = await loop.run_in_executor(None, lambda: self.dz.get_album(album_id))
+            try:
+                album_obj = await loop.run_in_executor(None, lambda: self.dz.get_album(album_id))
+            except Exception as e:
+                if any(s in str(e).lower() for s in ("403", "429", "rate limit", "too many requests", "timeout", "connection", "blocked", "quota")):
+                    raise RateLimitError(f"Deezer album API blocked: {e}")
+                raise MusicDownloadError(f"Deezer album API failed: {e}")
             if not album_obj:
                 raise MusicDownloadError("Deezer album not found")
 
@@ -129,7 +144,7 @@ class DeezerDownloader(MusicDownloader):
         raise MusicDownloadError("Unsupported Deezer URL type")
 
 
-dz_downloader = DeezerDownloader(storage.base_path, proxy=proxy)
+dz_downloader = DeezerDownloader(storage.base_path, proxy=proxy, gluetun=gluetun)
 
 
 @router.post("/scrape", response_model=ScrapeResponse)
