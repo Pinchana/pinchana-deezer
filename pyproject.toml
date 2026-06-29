@@ -1,15 +1,15 @@
 [project]
 name = "pinchana-deezer"
-version = "0.1.0"
+version = "0.2b0"
 description = "Deezer music downloader for Pinchana"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "pinchana-core",
-    "deezer-python>=7.2.0",
-    "fastapi>=0.136.1",
-    "uvicorn>=0.46.0",
-    "ytmusicapi>=1.10.0",
+    "deezer-python>=7.3.0",
+    "fastapi>=0.138.2",
+    "uvicorn>=0.49.0",
+    "ytmusicapi>=1.12.1",
 ]
 
 [tool.uv.sources]
