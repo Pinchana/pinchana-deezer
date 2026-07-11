@@ -188,7 +188,7 @@ async def health_check():
     try:
         status = await gluetun.get_vpn_status()
         vpn_status = status.get("status", "").lower()
-        if vpn_status != "running":
+        if gluetun.enabled and vpn_status != "running":
             raise HTTPException(status_code=503, detail=f"VPN not running: {vpn_status}")
         return {"status": "healthy", "service": "deezer", "vpn": status}
     except HTTPException:
