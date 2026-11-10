@@ -1,6 +1,6 @@
 [project]
 name = "pinchana-deezer"
-version = "26.10.2"
+version = "26.11.1"
 description = "Deezer music downloader for Pinchana"
 readme = "README.md"
 requires-python = ">=3.13"
