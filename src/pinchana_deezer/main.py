@@ -183,6 +183,40 @@ async def process_scrape_request(request: ScrapeRequest):
     return response
 
 
+@router.post("/playlist")
+async def playlist_metadata(request: ScrapeRequest):
+    """Internal metadata-only listing for web playlist jobs."""
+    from itertools import islice
+    from urllib.parse import urlsplit
+
+    parsed = urlsplit(str(request.url))
+    match = re.fullmatch(r"/(?:[a-z]{2}/)?(playlist|album)/(\d+)/?", parsed.path)
+    if parsed.hostname not in {"deezer.com", "www.deezer.com"} or not match:
+        raise HTTPException(400, "Invalid Deezer playlist URL")
+    kind, identifier = match.groups()
+
+    def listing():
+        collection = (dz_downloader.dz.get_playlist(int(identifier)) if kind == "playlist"
+                      else dz_downloader.dz.get_album(int(identifier)))
+        tracks = list(islice(collection.get_tracks(), 101))
+        if len(tracks) > 100:
+            raise HTTPException(400, "Playlists are limited to 100 items")
+        urls = []
+        for track in tracks:
+            if not str(track.id).isdigit():
+                raise HTTPException(400, "Playlist contains an unavailable track")
+            urls.append(f"https://www.deezer.com/track/{track.id}")
+        return {"title": collection.title, "urls": urls}
+
+    try:
+        return await asyncio.to_thread(listing)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Deezer playlist listing failed: %s", exc)
+        raise HTTPException(503, "Could not read Deezer playlist") from exc
+
+
 @router.get("/health")
 async def health_check():
     try:
