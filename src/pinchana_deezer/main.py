@@ -10,6 +10,7 @@ import asyncio
 import logging
 import os
 import re
+from typing import Callable
 
 import deezer
 from fastapi import APIRouter, FastAPI, HTTPException
@@ -50,7 +51,7 @@ def _search_ytmusic(query: str) -> str | None:
 class DeezerDownloader(MusicDownloader):
     """Deezer → YT Music search → yt-dlp download."""
 
-    def __init__(self, base_dir: str | os.PathLike, proxy: str | None = None, gluetun=None):
+    def __init__(self, base_dir: str | os.PathLike | Callable[[], str | os.PathLike], proxy: str | None = None, gluetun=None):
         super().__init__(base_dir, proxy, gluetun=gluetun)
         self.dz = deezer.Client()
 
@@ -144,11 +145,18 @@ class DeezerDownloader(MusicDownloader):
         raise MusicDownloadError("Unsupported Deezer URL type")
 
 
-dz_downloader = DeezerDownloader(storage.base_path, proxy=proxy, gluetun=gluetun)
+dz_downloader = DeezerDownloader(lambda: storage.base_path, proxy=proxy, gluetun=gluetun)
 
 
 @router.post("/scrape", response_model=ScrapeResponse)
 async def process_scrape_request(request: ScrapeRequest):
+    # singleflight includes the request cache scope, isolating different users.
+    return await storage.singleflight(
+        str(request.url), lambda: _process_scrape_request(request)
+    )
+
+
+async def _process_scrape_request(request: ScrapeRequest):
     url = str(request.url)
     if not re.match(r"(?:https?://)?(?:www\.)?(?:deezer\.com|deezer\.page\.link|link\.deezer\.com)/[^\s]+", url):
         raise HTTPException(status_code=400, detail="Invalid Deezer URL")
